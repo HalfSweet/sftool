@@ -16,8 +16,8 @@ apt-get install --assume-yes --no-install-recommends \
   gnupg
 
 # get our debian sources
-debsource="deb http://http.debian.net/debian/ buster main"
-debsource="${debsource}\ndeb http://security.debian.org/ buster/updates main"
+debsource="deb http://http.debian.net/debian/ bookworm main"
+debsource="${debsource}\ndeb http://security.debian.org/ bookworm/updates main"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
