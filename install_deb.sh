@@ -19,7 +19,7 @@ apt-get install --assume-yes --no-install-recommends \
   dpkg-dev
 
 # get our debian sources
-debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main contrib non-free"
+debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/  bullseye-updates main contrib non-free"
 debsource="${debsource}\ndeb https://security.debian.org/debian-security bullseye-security main contrib non-free"
 
 # temporarily use debian sources rather than ubuntu.
@@ -45,7 +45,7 @@ echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 apt-get update
 for dep in $@; do
-  apt-get install "${dep}:${arch}" --assume-yes --fix-broken
+  apt-get install "${dep}:${arch}" --assume-yes
 done
 
 # restore our old sources list
