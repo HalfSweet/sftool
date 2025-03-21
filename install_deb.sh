@@ -14,11 +14,15 @@ apt-get install --assume-yes --no-install-recommends \
   cpio \
   sharutils \
   gnupg \
-  debian-archive-keyring
+  debian-archive-keyring \
+  devscripts \
+  dpkg-dev
 
 # get our debian sources
 debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib"
+debsource="${debsource}\ndeb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib"
 debsource="${debsource}\ndeb https://security.debian.org/debian-security bookworm-security main contrib"
+debsource="${debsource}\ndeb-src https://security.debian.org/debian-security bookworm-security main contrib"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
@@ -43,7 +47,9 @@ echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 apt-get update
 for dep in $@; do
-  apt-get install "${dep}:${arch}" --assume-yes --fix-broken
+  # apt-get install "${dep}:${arch}" --assume-yes --fix-broken
+  apt-get source "${dep}:${arch}" --assume-yes
+  sudo apt-get --build source "${dep}:${arch}" --assume-yes
 done
 
 # restore our old sources list
