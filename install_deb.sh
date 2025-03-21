@@ -19,10 +19,8 @@ apt-get install --assume-yes --no-install-recommends \
   dpkg-dev
 
 # get our debian sources
-debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib"
-debsource="${debsource}\ndeb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib"
-debsource="${debsource}\ndeb https://security.debian.org/debian-security bookworm-security main contrib"
-debsource="${debsource}\ndeb-src https://security.debian.org/debian-security bookworm-security main contrib"
+debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main contrib non-free"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security bullseye-security main contrib non-free"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
@@ -49,7 +47,7 @@ apt-get update
 for dep in $@; do
   # apt-get install "${dep}:${arch}" --assume-yes --fix-broken
   apt-get source "${dep}:${arch}" --assume-yes
-  sudo apt-get --build source "${dep}:${arch}" --assume-yes
+  apt-get --build source "${dep}:${arch}" --assume-yes
 done
 
 # restore our old sources list
