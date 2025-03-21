@@ -17,8 +17,8 @@ apt-get install --assume-yes --no-install-recommends \
   debian-archive-keyring
 
 # get our debian sources
-debsource="deb http://archive.debian.org/debian/ bullseye main"
-debsource="${debsource}\ndeb https://security.debian.org/debian-security bullseye-security main"
+debsource="deb http://archive.debian.org/debian/ buster main"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security buster-security main"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
