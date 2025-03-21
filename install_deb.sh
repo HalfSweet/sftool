@@ -18,7 +18,7 @@ apt-get install --assume-yes --no-install-recommends \
 
 # get our debian sources
 debsource="deb http://archive.debian.org/debian/ buster main"
-# debsource="${debsource}\ndeb https://security.debian.org/debian-security buster-security main"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security buster/updates main"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
