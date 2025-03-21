@@ -45,9 +45,7 @@ echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 apt-get update
 for dep in $@; do
-  # apt-get install "${dep}:${arch}" --assume-yes --fix-broken
-  apt-get source "${dep}:${arch}" --assume-yes
-  apt-get --build source "${dep}:${arch}" --assume-yes
+  apt-get install "${dep}:${arch}" --assume-yes --fix-broken
 done
 
 # restore our old sources list
