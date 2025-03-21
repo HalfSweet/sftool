@@ -15,7 +15,7 @@ apt-get install --assume-yes --no-install-recommends \
   sharutils \
   gnupg
 
-curl -fsSL https://ftp-master.debian.org/keys/archive-key-12.10.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/debian-archive-bookworm.gpg
+curl -fsSL https://ftp-master.debian.org/keys/archive-key-12-security.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/debian-archive-bookworm.gpg
 apt-get update
 
 # get our debian sources
