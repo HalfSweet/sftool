@@ -16,7 +16,7 @@ pre-build = [
 pre-build = [
     "apt-get update && apt-get install -y pkg-config wget",
     "apt-get update && apt-get install --assume-yes ",
-    "apt-get update && apt-get install -y pkg-config libudev-dev:$CROSS_DEB_ARCH"
+    "TARGET_ARCH=armel /deny-debian-packages.sh libudev-dev"
 ]
 
 [target.i686-unknown-linux-gnu]
