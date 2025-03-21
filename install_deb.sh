@@ -13,10 +13,8 @@ apt-get install --assume-yes --no-install-recommends \
   curl \
   cpio \
   sharutils \
-  gnupg
-
-curl -fsSL https://ftp-master.debian.org/keys/archive-key-12-security.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/debian-archive-bookworm.gpg
-apt-get update
+  gnupg \
+  debian-archive-keyring
 
 # get our debian sources
 debsource="deb http://deb.debian.org/debian/ bookworm main"
