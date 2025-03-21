@@ -17,8 +17,8 @@ apt-get install --assume-yes --no-install-recommends \
   debian-archive-keyring
 
 # get our debian sources
-debsource="deb http://archive.debian.org/debian/ buster main"
-debsource="${debsource}\ndeb https://security.debian.org/debian-security buster/updates main"
+debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bookworm main contrib"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security bookworm-security main contrib"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
@@ -42,8 +42,6 @@ done
 echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 apt-get update
-apt-get dist-upgrade --assume-yes
-apt-get upgrade --assume-yes
 for dep in $@; do
   apt-get install "${dep}:${arch}" --assume-yes --fix-broken
 done
