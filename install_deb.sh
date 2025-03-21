@@ -17,8 +17,8 @@ apt-get install --assume-yes --no-install-recommends \
   debian-archive-keyring
 
 # get our debian sources
-debsource="deb https://mirrors.tuna.tsinghua.edu.cn/debian/ bullseye main contrib"
-debsource="${debsource}\ndeb https://security.debian.org/debian-security bullseye-security main contrib"
+debsource="deb http://archive.debian.org/debian/ buster main"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security buster/updates main"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
@@ -40,6 +40,9 @@ done
 
 # allow apt-get to retry downloads
 echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
+
+sudo apt-get dist-upgrade
+sudo apt-get upgrade 
 
 apt-get update
 for dep in $@; do
