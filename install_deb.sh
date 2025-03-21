@@ -17,8 +17,8 @@ apt-get install --assume-yes --no-install-recommends \
   debian-archive-keyring
 
 # get our debian sources
-debsource="deb http://deb.debian.org/debian/ bookworm main"
-debsource="${debsource}\ndeb https://security.debian.org/debian-security bookworm-security main"
+debsource="deb http://deb.debian.org/debian/ bullseye main"
+debsource="${debsource}\ndeb https://security.debian.org/debian-security bullseye-security main"
 
 # temporarily use debian sources rather than ubuntu.
 mv /etc/apt/sources.list /etc/apt/sources.list.bak
