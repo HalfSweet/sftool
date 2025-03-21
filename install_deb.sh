@@ -42,8 +42,8 @@ done
 echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 apt-get update
-sudo apt-get dist-upgrade --assume-yes
-sudo apt-get upgrade --assume-yes
+apt-get dist-upgrade --assume-yes
+apt-get upgrade --assume-yes
 for dep in $@; do
   apt-get install "${dep}:${arch}" --assume-yes --fix-broken
 done
