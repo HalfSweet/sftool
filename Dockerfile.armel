@@ -6,4 +6,4 @@ COPY install_deb.sh /
 # Change the packages to your dependencies.
 RUN chmod +x install_deb.sh
 ARG CROSS_DEB_ARCH
-RUN /install_deb.sh $CROSS_DEB_ARCH libudev-dev
+RUN /install_deb.sh $CROSS_DEB_ARCH libudev1 libudev-dev
