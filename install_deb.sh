@@ -41,10 +41,9 @@ done
 # allow apt-get to retry downloads
 echo 'APT::Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
-sudo apt-get dist-upgrade
-sudo apt-get upgrade 
-
 apt-get update
+sudo apt-get dist-upgrade --assume-yes
+sudo apt-get upgrade --assume-yes
 for dep in $@; do
   apt-get install "${dep}:${arch}" --assume-yes --fix-broken
 done
