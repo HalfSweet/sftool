@@ -12,7 +12,8 @@ use crate::common::sifli_debug::{
     ChipFrameFormat, RecvError, START_WORD, SifliDebug, SifliUartCommand, SifliUartResponse,
     common_debug,
 };
-use crate::{SifliToolBase, SifliToolTrait};
+use crate::sf32lb56::ram_command::DownloadStub;
+use crate::{SifliTool, SifliToolBase, SifliToolTrait};
 use serialport::SerialPort;
 use std::io::{BufReader, Read};
 use std::time::Duration;
@@ -204,35 +205,5 @@ impl SifliToolTrait for SF32LB56Tool {
             use crate::reset::Reset;
             Reset::soft_reset(self)
         })
-    }
-}
-
-impl crate::SifliTool for SF32LB56Tool {
-    fn create_tool(base_param: SifliToolBase) -> Box<dyn crate::SifliTool>
-    where
-        Self: Sized,
-    {
-        let baud = if base_param.baud == 0 { 460800 } else { base_param.baud };
-        let port = serialport::new(&base_param.port_name, baud)
-            .timeout(Duration::from_secs(5))
-            .open()
-            .unwrap();
-        
-        Box::new(Self {
-            base: base_param,
-            port,
-        })
-    }
-}
-
-impl SF32LB56Tool {
-    pub fn attempt_connect(&mut self) -> Result<(), std::io::Error> {
-        // 简化的连接实现
-        Ok(())
-    }
-
-    pub fn download_stub_impl(&mut self) -> Result<(), std::io::Error> {
-        // 简化的stub下载实现
-        Ok(())
     }
 }

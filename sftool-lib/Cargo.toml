@@ -31,3 +31,5 @@ lazy_static = "1.5.0"
 clap = { version = "4.2.1", features = ["derive"], optional = true }
 probe-rs = { version = "0.27.0"}
 bitfield = "0.19.0"
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"

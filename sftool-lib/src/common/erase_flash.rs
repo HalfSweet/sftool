@@ -21,8 +21,7 @@ impl EraseOps {
                     .unwrap(),
             );
             progress_bar.set_message(format!("0x{:08X}", address));
-            progress_bar.set_prefix(format!("0x{:02X}", tool.step()));
-            *tool.step_mut() = tool.step().wrapping_add(1);
+            progress_bar.set_prefix("ERASE");
         }
 
         // 发送擦除所有命令
@@ -75,8 +74,7 @@ impl EraseOps {
                     .unwrap(),
             );
             progress_bar.set_message(format!("0x{:08X} (size: 0x{:08X})", address, len));
-            progress_bar.set_prefix(format!("0x{:02X}", tool.step()));
-            *tool.step_mut() = tool.step().wrapping_add(1);
+            progress_bar.set_prefix("ERASE");
         }
 
         // 发送擦除区域命令

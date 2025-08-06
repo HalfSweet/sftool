@@ -1,9 +1,11 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use serialport;
-use sftool_lib::{ChipType, Operation, SifliToolBase, create_sifli_tool};
+use sftool_lib::{ChipType, Operation, SifliToolBase, create_sifli_tool, ProgressInfo};
 use std::io::ErrorKind;
 use std::process;
 use strum::{Display, EnumString};
+use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::{Arc, Mutex};
 
 mod config;
 use config::SfToolConfig;
@@ -26,8 +28,52 @@ fn config_region_to_string(region: &config::RegionItemConfig) -> String {
     format!("{}:{}", region.address.0, region.size.0)
 }
 
+/// Create a progress callback that displays progress using indicatif
+fn create_progress_callback() -> sftool_lib::ProgressCallback {
+    let progress_bars: Arc<Mutex<std::collections::HashMap<u32, ProgressBar>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
+    
+    let progress_bars_clone = Arc::clone(&progress_bars);
+    Box::new(move |info: ProgressInfo| {
+        let mut bars = progress_bars_clone.lock().unwrap();
+        let pb = bars.entry(info.step).or_insert_with(|| {
+            let pb = if let Some(total) = info.total_bytes {
+                ProgressBar::new(total)
+            } else {
+                ProgressBar::new_spinner()
+            };
+            
+            if info.total_bytes.is_some() {
+                pb.set_style(ProgressStyle::default_bar()
+                    .template("[{prefix}] {msg} {wide_bar} {bytes_per_sec} {percent_precise}%")
+                    .unwrap()
+                    .progress_chars("=>-"));
+            } else {
+                pb.set_style(ProgressStyle::default_spinner()
+                    .template("[{prefix}] {spinner} {msg}")
+                    .unwrap());
+            }
+            
+            pb.set_prefix(format!("0x{:02X}", info.step));
+            pb
+        });
+        
+        pb.set_message(info.message);
+        if let Some(processed) = Some(info.bytes_processed) {
+            pb.set_position(processed);
+        }
+        
+        // 如果任务完成，清理进度条
+        if let (Some(total), processed) = (info.total_bytes, info.bytes_processed) {
+            if processed >= total {
+                pb.finish();
+                bars.remove(&info.step);
+            }
+        }
+    })
+}
+
 /// Execute command from config file
-fn execute_config_command(
+async fn execute_config_command(
     config: &SfToolConfig,
     siflitool: &mut Box<dyn sftool_lib::SifliTool>,
 ) -> Result<(), std::io::Error> {
@@ -64,7 +110,7 @@ fn execute_config_command(
             no_compress: write_flash.no_compress,
             erase_all: write_flash.erase_all,
         };
-        siflitool.write_flash(&write_params)
+        siflitool.write_flash(&write_params, Some(create_progress_callback())).await
     } else if let Some(ref read_flash) = config.read_flash {
         // Convert config files to CLI format
         let files: Vec<String> = read_flash
@@ -90,7 +136,7 @@ fn execute_config_command(
         let read_params = sftool_lib::ReadFlashParams {
             files: parsed_files,
         };
-        siflitool.read_flash(&read_params)
+        siflitool.read_flash(&read_params, Some(create_progress_callback())).await
     } else if let Some(ref erase_flash) = config.erase_flash {
         // Parse erase address using existing logic
         let address = match sftool_lib::utils::Utils::parse_erase_address(&erase_flash.address.0) {
@@ -105,7 +151,7 @@ fn execute_config_command(
         };
 
         let erase_params = sftool_lib::EraseFlashParams { address };
-        siflitool.erase_flash(&erase_params)
+        siflitool.erase_flash(&erase_params, Some(create_progress_callback())).await
     } else if let Some(ref erase_region) = config.erase_region {
         // Convert config regions to CLI format
         let regions: Vec<String> = erase_region
@@ -131,7 +177,7 @@ fn execute_config_command(
         let erase_region_params = sftool_lib::EraseRegionParams {
             regions: parsed_regions,
         };
-        siflitool.erase_region(&erase_region_params)
+        siflitool.erase_region(&erase_region_params, Some(create_progress_callback())).await
     } else {
         Err(std::io::Error::new(
             ErrorKind::InvalidInput,
@@ -426,7 +472,8 @@ fn check_port_available(port_name: &str) -> Result<(), String> {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Initialize tracing, set log level from environment variable
     // Log level can be controlled by setting the RUST_LOG environment variable, e.g.:
     // RUST_LOG=debug, RUST_LOG=sftool_lib=trace, RUST_LOG=info
@@ -488,7 +535,7 @@ fn main() {
     );
 
     if baud != 1000000 {
-        siflitool.set_speed(baud).unwrap();
+        siflitool.set_speed(baud).await.unwrap();
     }
 
     // Determine which command to execute
@@ -524,7 +571,7 @@ fn main() {
                         no_compress: params.no_compress,
                         erase_all: params.erase_all,
                     };
-                    siflitool.write_flash(&write_params)
+                    siflitool.write_flash(&write_params, Some(create_progress_callback())).await
                 }
                 Commands::ReadFlash(params) => {
                     // 在CLI中解析读取文件信息
@@ -542,7 +589,7 @@ fn main() {
                     }
 
                     let read_params = sftool_lib::ReadFlashParams { files };
-                    siflitool.read_flash(&read_params)
+                    siflitool.read_flash(&read_params, Some(create_progress_callback())).await
                 }
                 Commands::EraseFlash(params) => {
                     // 在CLI中解析擦除地址
@@ -559,7 +606,7 @@ fn main() {
                         };
 
                     let erase_params = sftool_lib::EraseFlashParams { address };
-                    siflitool.erase_flash(&erase_params)
+                    siflitool.erase_flash(&erase_params, Some(create_progress_callback())).await
                 }
                 Commands::EraseRegion(params) => {
                     // 在CLI中解析擦除区域信息
@@ -577,11 +624,11 @@ fn main() {
                     }
 
                     let erase_region_params = sftool_lib::EraseRegionParams { regions };
-                    siflitool.erase_region(&erase_region_params)
+                    siflitool.erase_region(&erase_region_params, Some(create_progress_callback())).await
                 }
             }
         }
-        CommandSource::Config(config) => execute_config_command(&config, &mut siflitool),
+        CommandSource::Config(config) => execute_config_command(&config, &mut siflitool).await,
     };
 
     if let Err(e) = res {
@@ -589,6 +636,6 @@ fn main() {
     }
 
     if after != Operation::None {
-        siflitool.soft_reset().unwrap();
+        siflitool.soft_reset().await.unwrap();
     }
 }

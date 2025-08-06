@@ -5,11 +5,11 @@ use std::future::Future;
 use std::pin::Pin;
 
 impl EraseFlashTrait for SF32LB58Tool {
-    fn erase_flash<'a>(
-        &'a mut self, 
-        params: &'a EraseFlashParams,
+    fn erase_flash(
+        &mut self, 
+        params: &EraseFlashParams,
         progress_callback: Option<ProgressCallback>
-    ) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
         Box::pin(async move {
             if let Some(ref callback) = progress_callback {
                 callback(crate::ProgressInfo {
@@ -27,11 +27,11 @@ impl EraseFlashTrait for SF32LB58Tool {
         })
     }
 
-    fn erase_region<'a>(
-        &'a mut self, 
-        params: &'a EraseRegionParams,
+    fn erase_region(
+        &mut self, 
+        params: &EraseRegionParams,
         progress_callback: Option<ProgressCallback>
-    ) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + 'a>> {
+    ) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
         Box::pin(async move {
             let mut current_step = 1u32;
             
@@ -53,5 +53,22 @@ impl EraseFlashTrait for SF32LB58Tool {
             }
             Ok(())
         })
+    }
+}Tool;
+use crate::common::erase_flash::EraseOps;
+use crate::erase_flash::EraseFlashTrait;
+use crate::{EraseFlashParams, EraseRegionParams};
+
+impl EraseFlashTrait for SF32LB58Tool {
+    fn erase_flash(&mut self, params: &EraseFlashParams) -> Result<(), std::io::Error> {
+        EraseOps::erase_all(self, params.address)
+    }
+
+    fn erase_region(&mut self, params: &EraseRegionParams) -> Result<(), std::io::Error> {
+        // 处理每个区域
+        for region in params.regions.iter() {
+            EraseOps::erase_region(self, region.address, region.size)?;
+        }
+        Ok(())
     }
 }

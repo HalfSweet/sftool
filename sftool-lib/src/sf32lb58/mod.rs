@@ -12,11 +12,12 @@ use crate::{SifliTool, SifliToolBase, SifliToolTrait};
 use serialport::SerialPort;
 use std::io::Write;
 use std::time::Duration;
+use std::future::Future;
+use std::pin::Pin;
 
 pub struct SF32LB58Tool {
     pub base: SifliToolBase,
     pub port: Box<dyn SerialPort>,
-    pub step: i32,
 }
 
 /// DFU协议命令类型
@@ -96,10 +97,9 @@ impl SF32LB58Tool {
         if !self.base.quiet {
             spinner.enable_steady_tick(std::time::Duration::from_millis(100));
             spinner.set_style(ProgressStyle::with_template("[{prefix}] {spinner} {msg}").unwrap());
-            spinner.set_prefix(format!("0x{:02X}", self.step));
+            spinner.set_prefix("SF58");
             spinner.set_message("Download stub...");
         }
-        self.step = self.step.wrapping_add(1);
 
         // 1. 下载签名公钥文件 (58X_sig_pub.der)
         tracing::debug!("Loading signature public key file: {}", SIG_PUB_FILE);
@@ -359,7 +359,6 @@ impl SifliTool for SF32LB58Tool {
         let mut tool = Box::new(Self {
             base,
             port,
-            step: 0,
         });
         tool.download_stub().expect("Failed to download stub");
         tool
@@ -375,20 +374,16 @@ impl SifliToolTrait for SF32LB58Tool {
         &self.base
     }
 
-    fn step(&self) -> i32 {
-        self.step
+    fn set_speed(&mut self, _baud: u32) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
+        Box::pin(async move {
+            todo!("SF32LB58Tool::set_speed not implemented yet")
+        })
     }
 
-    fn step_mut(&mut self) -> &mut i32 {
-        &mut self.step
-    }
-
-    fn set_speed(&mut self, _baud: u32) -> Result<(), std::io::Error> {
-        todo!("SF32LB58Tool::set_speed not implemented yet")
-    }
-
-    fn soft_reset(&mut self) -> Result<(), std::io::Error> {
-        use crate::reset::Reset;
-        Reset::soft_reset(self)
+    fn soft_reset(&mut self) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
+        Box::pin(async move {
+            use crate::reset::Reset;
+            Reset::soft_reset(self)
+        })
     }
 }

@@ -5,6 +5,7 @@ pub mod reset;
 pub mod speed;
 pub mod utils;
 pub mod write_flash;
+pub mod async_wrapper;
 
 // 公共模块，包含可复用的逻辑
 pub mod common;
@@ -18,6 +19,21 @@ use crate::erase_flash::EraseFlashTrait;
 use crate::read_flash::ReadFlashTrait;
 use crate::write_flash::WriteFlashTrait;
 use serialport::SerialPort;
+use std::future::Future;
+use std::pin::Pin;
+
+// 进度回调类型定义
+pub type ProgressCallback = Box<dyn Fn(ProgressInfo) + Send + Sync>;
+
+#[derive(Debug, Clone)]
+pub struct ProgressInfo {
+    pub step: u32,
+    pub total_steps: Option<u32>,
+    pub current_file: Option<String>,
+    pub bytes_processed: u64,
+    pub total_bytes: Option<u64>,
+    pub message: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
@@ -41,7 +57,6 @@ pub enum ChipType {
     SF32LB58,
 }
 
-#[derive(Clone)]
 pub struct SifliToolBase {
     pub port_name: String,
     pub before: Operation,
@@ -99,17 +114,11 @@ pub trait SifliToolTrait {
     /// 获取基础配置的引用
     fn base(&self) -> &SifliToolBase;
 
-    /// 获取当前步骤
-    fn step(&self) -> i32;
-
-    /// 获取当前步骤的可变引用
-    fn step_mut(&mut self) -> &mut i32;
-
-    fn set_speed(&mut self, baud: u32) -> Result<(), std::io::Error>;
-    fn soft_reset(&mut self) -> Result<(), std::io::Error>;
+    fn set_speed(&mut self, baud: u32) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>>;
+    fn soft_reset(&mut self) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>>;
 }
 
-pub trait SifliTool: SifliToolTrait + WriteFlashTrait + ReadFlashTrait + EraseFlashTrait {
+pub trait SifliTool: SifliToolTrait + WriteFlashTrait + ReadFlashTrait + EraseFlashTrait + Send {
     /// 工厂函数，根据芯片类型创建对应的 SifliTool 实现
     fn create_tool(base_param: SifliToolBase) -> Box<dyn SifliTool>
     where

@@ -13,40 +13,44 @@ use crate::sf32lb52::ram_command::DownloadStub;
 use crate::{SifliTool, SifliToolBase, SifliToolTrait};
 use serialport::SerialPort;
 use std::time::Duration;
+use std::future::Future;
+use std::pin::Pin;
 
 pub struct SF32LB52Tool {
     pub base: SifliToolBase,
     pub port: Box<dyn SerialPort>,
-    pub step: i32,
 }
 
 impl SF32LB52Tool {
-    /// 执行全部flash擦除的内部方法
-    pub fn internal_erase_all(&mut self, address: u32) -> Result<(), std::io::Error> {
-        use indicatif::{ProgressBar, ProgressStyle};
+    /// 执行全部flash擦除的内部方法（异步版本）
+    pub async fn internal_erase_all_async(
+        &mut self, 
+        address: u32,
+        progress_callback: Option<&crate::ProgressCallback>,
+        step: u32
+    ) -> Result<(), std::io::Error> {
         use ram_command::{Command, RamCommand};
 
-        let progress_bar = ProgressBar::new_spinner();
-        if !self.base().quiet {
-            progress_bar.set_style(
-                ProgressStyle::default_spinner()
-                    .template("[{prefix}] Erasing entire flash at {msg}... {spinner}")
-                    .unwrap(),
-            );
-            progress_bar.set_message(format!("0x{:08X}", address));
-            progress_bar.set_prefix(format!("0x{:02X}", self.step));
-            self.step = self.step.wrapping_add(1);
+        if let Some(callback) = progress_callback {
+            callback(crate::ProgressInfo {
+                step,
+                total_steps: None,
+                current_file: None,
+                bytes_processed: 0,
+                total_bytes: None,
+                message: format!("Erasing entire flash at 0x{:08X}", address),
+            });
         }
 
         // 发送擦除所有命令
         let _ = self.command(Command::EraseAll { address });
 
         let mut buffer = Vec::new();
-        let now = std::time::SystemTime::now();
+        let start_time = std::time::Instant::now();
 
         // 等待擦除完成
         loop {
-            let elapsed = now.elapsed().unwrap().as_millis();
+            let elapsed = start_time.elapsed().as_millis();
             if elapsed > 30000 {
                 // 擦除可能需要更长时间
                 tracing::error!("response string is {}", String::from_utf8_lossy(&buffer));
@@ -59,6 +63,7 @@ impl SF32LB52Tool {
             let mut byte = [0];
             let ret = self.port().read_exact(&mut byte);
             if ret.is_err() {
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                 continue;
             }
             buffer.push(byte[0]);
@@ -69,36 +74,46 @@ impl SF32LB52Tool {
             }
         }
 
-        if !self.base().quiet {
-            progress_bar
-                .finish_with_message(format!("Erase flash successfully: 0x{:08X}", address));
+        if let Some(callback) = progress_callback {
+            callback(crate::ProgressInfo {
+                step: step + 1,
+                total_steps: None,
+                current_file: None,
+                bytes_processed: 0,
+                total_bytes: None,
+                message: format!("Erase flash successfully: 0x{:08X}", address),
+            });
         }
 
         Ok(())
     }
 
-    /// 执行区域擦除的内部方法
-    pub fn internal_erase_region(&mut self, address: u32, len: u32) -> Result<(), std::io::Error> {
-        use indicatif::{ProgressBar, ProgressStyle};
+    /// 执行区域擦除的内部方法（异步版本）
+    pub async fn internal_erase_region_async(
+        &mut self, 
+        address: u32, 
+        len: u32,
+        progress_callback: Option<&crate::ProgressCallback>,
+        step: u32
+    ) -> Result<(), std::io::Error> {
         use ram_command::{Command, RamCommand};
 
-        let progress_bar = ProgressBar::new(len as u64);
-        if !self.base().quiet {
-            progress_bar.set_style(
-                ProgressStyle::default_spinner()
-                    .template("[{prefix}] Erasing entire flash at {msg}... {spinner}")
-                    .unwrap(),
-            );
-            progress_bar.set_message(format!("0x{:08X}", address));
-            progress_bar.set_prefix(format!("0x{:02X}", self.step));
-            self.step = self.step.wrapping_add(1);
+        if let Some(callback) = progress_callback {
+            callback(crate::ProgressInfo {
+                step,
+                total_steps: None,
+                current_file: None,
+                bytes_processed: 0,
+                total_bytes: Some(len as u64),
+                message: format!("Erasing region at 0x{:08X}", address),
+            });
         }
 
         // 发送擦除区域命令
         let _ = self.command(Command::Erase { address, len });
 
         let mut buffer = Vec::new();
-        let now = std::time::SystemTime::now();
+        let start_time = std::time::Instant::now();
 
         let timeout_ms = (len as u128 / (4 * 1024) + 1) * 800; // 我们假设每擦除1个sector（4KB）最长时间不超过800ms
         tracing::info!(
@@ -110,7 +125,7 @@ impl SF32LB52Tool {
 
         // 等待擦除完成
         loop {
-            let elapsed = now.elapsed().unwrap().as_millis();
+            let elapsed = start_time.elapsed().as_millis();
             if elapsed > timeout_ms {
                 // 擦除可能需要更长时间
                 tracing::error!("response string is {}", String::from_utf8_lossy(&buffer));
@@ -123,6 +138,7 @@ impl SF32LB52Tool {
             let mut byte = [0];
             let ret = self.port().read_exact(&mut byte);
             if ret.is_err() {
+                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                 continue;
             }
             buffer.push(byte[0]);
@@ -133,14 +149,102 @@ impl SF32LB52Tool {
             }
         }
 
-        if !self.base().quiet {
-            progress_bar.finish_with_message(format!(
-                "Erase region successfully: 0x{:08X} (length: {} bytes)",
-                address, len
-            ));
+        if let Some(callback) = progress_callback {
+            callback(crate::ProgressInfo {
+                step: step + 1,
+                total_steps: None,
+                current_file: None,
+                bytes_processed: len as u64,
+                total_bytes: Some(len as u64),
+                message: format!("Erase region successfully: 0x{:08X} (length: {} bytes)", address, len),
+            });
         }
 
         Ok(())
+    }
+
+    async fn attempt_connect_async(
+        &mut self,
+        progress_callback: Option<&crate::ProgressCallback>,
+        step: u32
+    ) -> Result<(), std::io::Error> {
+        use crate::Operation;
+        use crate::common::sifli_debug::{SifliUartCommand, SifliUartResponse};
+
+        let infinite_attempts = self.base.connect_attempts <= 0;
+        let mut remaining_attempts = if infinite_attempts {
+            None
+        } else {
+            Some(self.base.connect_attempts)
+        };
+        loop {
+            if self.base.before == Operation::DefaultReset {
+                // 使用RTS引脚复位
+                self.port.write_request_to_send(true)?;
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                self.port.write_request_to_send(false)?;
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+            let value = match self.debug_command(SifliUartCommand::Enter) {
+                Ok(SifliUartResponse::Enter) => Ok(()),
+                _ => Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Failed to enter debug mode",
+                )),
+            };
+            // 如果有限重试，检查是否还有机会
+            if let Some(ref mut attempts) = remaining_attempts {
+                if *attempts == 0 {
+                    break; // 超过最大重试次数则退出循环
+                }
+                *attempts -= 1;
+            }
+
+            if let Some(callback) = progress_callback {
+                callback(crate::ProgressInfo {
+                    step,
+                    total_steps: None,
+                    current_file: None,
+                    bytes_processed: 0,
+                    total_bytes: None,
+                    message: "Connecting to chip...".to_string(),
+                });
+            }
+
+            // 尝试连接
+            match value {
+                Ok(_) => {
+                    if let Some(callback) = progress_callback {
+                        callback(crate::ProgressInfo {
+                            step: step + 1,
+                            total_steps: None,
+                            current_file: None,
+                            bytes_processed: 0,
+                            total_bytes: None,
+                            message: "Connected success!".to_string(),
+                        });
+                    }
+                    return Ok(());
+                }
+                Err(_) => {
+                    if let Some(callback) = progress_callback {
+                        callback(crate::ProgressInfo {
+                            step,
+                            total_steps: None,
+                            current_file: None,
+                            bytes_processed: 0,
+                            total_bytes: None,
+                            message: "Failed to connect to the chip, retrying...".to_string(),
+                        });
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Failed to connect to the chip",
+        ))
     }
 
     fn attempt_connect(&mut self) -> Result<(), std::io::Error> {
@@ -176,29 +280,12 @@ impl SF32LB52Tool {
                 *attempts -= 1;
             }
 
-            use indicatif::{ProgressBar, ProgressStyle};
-            let spinner = ProgressBar::new_spinner();
-            if !self.base.quiet {
-                spinner.enable_steady_tick(Duration::from_millis(100));
-                spinner
-                    .set_style(ProgressStyle::with_template("[{prefix}] {spinner} {msg}").unwrap());
-                spinner.set_prefix(format!("0x{:02X}", self.step));
-                self.step = self.step.wrapping_add(1);
-                spinner.set_message("Connecting to chip...");
-            }
-
             // 尝试连接
             match value {
                 Ok(_) => {
-                    if !self.base.quiet {
-                        spinner.finish_with_message("Connected success!");
-                    }
                     return Ok(());
                 }
                 Err(_) => {
-                    if !self.base.quiet {
-                        spinner.finish_with_message("Failed to connect to the chip, retrying...");
-                    }
                     std::thread::sleep(Duration::from_millis(500));
                 }
             }
@@ -212,19 +299,9 @@ impl SF32LB52Tool {
     fn download_stub_impl(&mut self) -> Result<(), std::io::Error> {
         use crate::common::sifli_debug::SifliUartCommand;
         use crate::ram_stub::{self, CHIP_FILE_NAME};
-        use indicatif::{ProgressBar, ProgressStyle};
         use probe_rs::MemoryMappedRegister;
         use probe_rs::architecture::arm::core::armv7m::{Aircr, Demcr};
         use probe_rs::architecture::arm::core::registers::cortex_m::{PC, SP};
-
-        let spinner = ProgressBar::new_spinner();
-        if !self.base.quiet {
-            spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-            spinner.set_style(ProgressStyle::with_template("[{prefix}] {spinner} {msg}").unwrap());
-            spinner.set_prefix(format!("0x{:02X}", self.step));
-            spinner.set_message("Download stub...");
-        }
-        self.step = self.step.wrapping_add(1);
 
         // 1. reset and halt
         //    1.1. reset_catch_set
@@ -260,10 +337,6 @@ impl SF32LB52Tool {
                 .expect("REASON"),
         );
         let Some(stub) = stub else {
-            if !self.base.quiet {
-                spinner
-                    .finish_with_message("No stub file found for the given chip and memory type");
-            }
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "No stub file found for the given chip and memory type",
@@ -299,10 +372,6 @@ impl SF32LB52Tool {
         // 3.2. run
         self.debug_run()?;
 
-        if !self.base.quiet {
-            spinner.finish_with_message("Download stub success!");
-        }
-
         Ok(())
     }
 }
@@ -319,7 +388,6 @@ impl SifliTool for SF32LB52Tool {
         let mut tool = Box::new(Self {
             base,
             port,
-            step: 0,
         });
         tool.download_stub().expect("Failed to download stub");
         tool
@@ -335,21 +403,17 @@ impl SifliToolTrait for SF32LB52Tool {
         &self.base
     }
 
-    fn step(&self) -> i32 {
-        self.step
+    fn set_speed(&mut self, baud: u32) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
+        Box::pin(async move {
+            use crate::speed::SpeedTrait;
+            SpeedTrait::set_speed(self, baud)
+        })
     }
 
-    fn step_mut(&mut self) -> &mut i32 {
-        &mut self.step
-    }
-
-    fn set_speed(&mut self, baud: u32) -> Result<(), std::io::Error> {
-        use crate::speed::SpeedTrait;
-        SpeedTrait::set_speed(self, baud)
-    }
-
-    fn soft_reset(&mut self) -> Result<(), std::io::Error> {
-        use crate::reset::Reset;
-        Reset::soft_reset(self)
+    fn soft_reset(&mut self) -> Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send + '_>> {
+        Box::pin(async move {
+            use crate::reset::Reset;
+            Reset::soft_reset(self)
+        })
     }
 }
